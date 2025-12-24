@@ -1,0 +1,68 @@
+.student-finder {
+  width: 100%;
+  max-width: 520px;
+  position: relative;
+}
+
+.finder-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.finder-input input {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+}
+
+.finder-results {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.finder-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.finder-item:hover {
+  background: #f8fafc;
+}
+
+.finder-item strong {
+  font-size: 14px;
+}
+
+.muted {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.finder-state {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.finder-error {
+  margin-top: 8px;
+  color: #dc2626;
+  font-size: 13px;
+}
