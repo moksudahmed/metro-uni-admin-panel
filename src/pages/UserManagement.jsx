@@ -1,33 +1,34 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Search, User, Lock, AlertCircle } from "lucide-react";
+import { Search, User, PlusCircle, X } from "lucide-react";
 import Profile from "./Students/Profile";
+import Account from "./Students/Account";
 import "./user-management.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL;
+const TABS = ["search", "profile", "account", "password"];
 
-const UserManagement = ({ token }) => {
+export default function UserManagement({ token }) {
   const [tab, setTab] = useState("search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const [selectedStudentID, setSelectedStudentID] = useState(null);
 
-  const [account, setAccount] = useState({
+  const [checkingAccount, setCheckingAccount] = useState(false);
+  const [accountExists, setAccountExists] = useState(false);
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const [accountForm, setAccountForm] = useState({
     loginID: "",
     usr_active: true,
   });
 
-  const [password, setPassword] = useState({
-    new: "",
-    confirm: "",
-  });
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [searched, setSearched] = useState(false);
-
-  /* =========================
-     SEARCH STUDENTS
-  ========================= */
+  /* ================= SEARCH ================= */
   const searchStudents = async () => {
     const q = query.trim();
     if (!q) return;
@@ -40,146 +41,114 @@ const UserManagement = ({ token }) => {
     try {
       const res = await fetch(
         `${API_BASE_URL}/api/v1/admin/students/${q}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      if (!res.ok) throw new Error("Search failed");
+      if (!res.ok) throw new Error();
 
       const data = await res.json();
-
-      // ✅ Normalize response
-      const students = Array.isArray(data) ? data : [data];
-
-      setResults(students);
-      setSearched(true);
-    } catch (err) {
-      console.error("Search error:", err);
+      setResults(Array.isArray(data) ? data : [data]);
+    } catch {
       setError("Unable to search students");
-      setResults([]);
-      setSearched(true);
     } finally {
       setLoading(false);
+      setSearched(true);
     }
   };
 
-  /* =========================
-     SELECT STUDENT (FIXED)
-  ========================= */
-  const loadAccount = useCallback((student) => {
-    if (!student || !student.student_id) {
-      console.error("Invalid student object:", student);
-      return;
-    }
-
-    const id = student.student_id;
-
-    console.log("✅ Selected student ID:", id);
-
-    setSelectedStudentID(id);
+  /* ================= SELECT STUDENT ================= */
+  const selectStudent = useCallback((student) => {
+    setSelectedStudentID(student.student_id);
     setTab("profile");
-    console.log(id);
+    setShowCreateForm(false);
+    setAccountExists(false);
   }, []);
 
-  /* =========================
-     LOAD USER ACCOUNT
-  ========================= */
+  /* ================= CHECK ACCOUNT ================= */
   useEffect(() => {
     if (!selectedStudentID) return;
 
-    console.log("📌 Loading account for:", selectedStudentID);
-
-    const fetchAccount = async () => {
+    const checkAccount = async () => {
+      setCheckingAccount(true);
       try {
         const res = await fetch(
           `${API_BASE_URL}/api/v1/admin/student-users/${selectedStudentID}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          { headers: { Authorization: `Bearer ${token}` } }
         );
-
-        if (!res.ok) {
-          setAccount({ loginID: "", usr_active: true });
-          return;
-        }
-
-        const data = await res.json();
-
-        setAccount({
-          loginID: data.loginID || "",
-          usr_active: Boolean(data.usr_active),
-        });
-      } catch (err) {
-        console.error("Account load failed:", err);
-        setAccount({ loginID: "", usr_active: true });
+        setAccountExists(res.ok);
+      } catch {
+        setAccountExists(false);
+      } finally {
+        setCheckingAccount(false);
       }
     };
 
-    fetchAccount();
+    checkAccount();
   }, [selectedStudentID, token]);
 
-  /* =========================
-     RESET PASSWORD
-  ========================= */
-  const resetPassword = async () => {
-    if (!password.new || password.new !== password.confirm) {
-      alert("Passwords do not match");
-      return;
+  /* ================= CREATE ACCOUNT ================= */
+  const submitCreateAccount = async (e) => {
+    e.preventDefault();
+    if (!accountForm.loginID.trim()) return;
+
+    setCreating(true);
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/v1/admin/student-users/${selectedStudentID}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(accountForm),
+        }
+      );
+
+      if (!res.ok) throw new Error();
+
+      setAccountExists(true);
+      setShowCreateForm(false);
+      setTab("account");
+      alert("Account created successfully");
+    } catch {
+      alert("Failed to create account");
+    } finally {
+      setCreating(false);
     }
-
-    if (!selectedStudentID) return;
-
-    await fetch(
-      `${API_BASE_URL}/api/v1/admin/student-users/${selectedStudentID}/password`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ password: password.new }),
-      }
-    );
-
-    setPassword({ new: "", confirm: "" });
-    alert("Password reset successful");
   };
 
-  /* =========================
-     RENDER
-  ========================= */
   return (
-    <div className="profile-page">
-      <div className="profile-header">
+    <div className="user-page">
+      <header className="user-header">
         <h2>User Management</h2>
         <p>Search and manage student user accounts</p>
-      </div>
+      </header>
 
-      {/* Tabs */}
+      {/* ================= TABS ================= */}
       <div className="tabs">
-        {["search", "profile", "password"].map((t) => (
+        {TABS.map((t) => (
           <button
             key={t}
             className={`tab ${tab === t ? "active" : ""}`}
             onClick={() => setTab(t)}
-            disabled={t !== "search" && !selectedStudentID}
+            disabled={
+              t !== "search" &&
+              (!selectedStudentID ||
+                (t === "password" && !accountExists))
+            }
           >
             {t.toUpperCase()}
           </button>
         ))}
       </div>
 
-      {/* SEARCH TAB */}
+      {/* ================= SEARCH ================= */}
       {tab === "search" && (
         <>
           <div className="search-box">
             <input
-              placeholder="Student ID"
+              placeholder="Enter Student ID"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && searchStudents()}
@@ -189,65 +158,95 @@ const UserManagement = ({ token }) => {
             </button>
           </div>
 
-          {loading && <div className="profile-state loading">Searching…</div>}
-          {error && <div className="profile-state error">{error}</div>}
+          {loading && <div className="state loading">Searching…</div>}
+          {error && <div className="state error">{error}</div>}
           {!loading && searched && results.length === 0 && (
-            <div className="profile-state empty">No students found.</div>
+            <div className="state empty">No students found.</div>
           )}
 
           {results.map((s) => (
             <div
               key={s.student_id}
               className="search-result"
-              onClick={() => loadAccount(s)}
+              onClick={() => selectStudent(s)}
             >
               <User size={18} />
               <div>
                 <strong>{s.per_name}</strong>
-                <div className="muted">{s.student_id}</div>
+                <span>{s.student_id}</span>
               </div>
             </div>
           ))}
         </>
       )}
 
-      {/* PROFILE TAB */}
+      {/* ================= PROFILE ================= */}
       {tab === "profile" && selectedStudentID && (
-        <Profile student_id={selectedStudentID} token={token} />
+        <>
+          <Profile studentId={selectedStudentID} token={token} />
+
+          {!checkingAccount && !accountExists && (
+            <div className="card warning">
+              <p>No account exists for this student.</p>
+              <button onClick={() => setShowCreateForm(true)}>
+                <PlusCircle size={16} /> Create Account
+              </button>
+            </div>
+          )}
+
+          {showCreateForm && (
+            <div className="card">
+              <div className="card-header">
+                <h3>Create Student Account</h3>
+                <button
+                  className="icon-btn"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={submitCreateAccount}>
+                <label>Login ID</label>
+                <input
+                  value={accountForm.loginID}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, loginID: e.target.value })
+                  }
+                  required
+                />
+
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={accountForm.usr_active}
+                    onChange={(e) =>
+                      setAccountForm({
+                        ...accountForm,
+                        usr_active: e.target.checked,
+                      })
+                    }
+                  />
+                  Active Account
+                </label>
+
+                <button disabled={creating}>
+                  {creating ? "Creating…" : "Create Account"}
+                </button>
+              </form>
+            </div>
+          )}
+        </>
       )}
 
-      {/* PASSWORD TAB */}
-      {tab === "password" && selectedStudentID && (
-        <div className="profile-card">
-          <h3>
-            <Lock size={16} /> Reset Password
-          </h3>
+      {/* ================= ACCOUNT ================= */}
+      {tab === "account" && selectedStudentID && accountExists && (
+        <Account studentId={selectedStudentID} token={token} />
+      )}
 
-          <input
-            type="password"
-            placeholder="New password"
-            value={password.new}
-            onChange={(e) =>
-              setPassword({ ...password, new: e.target.value })
-            }
-          />
-
-          <input
-            type="password"
-            placeholder="Confirm password"
-            value={password.confirm}
-            onChange={(e) =>
-              setPassword({ ...password, confirm: e.target.value })
-            }
-          />
-
-          <button onClick={resetPassword}>
-            <AlertCircle size={16} /> Reset Password
-          </button>
-        </div>
+      {tab === "password" && selectedStudentID && accountExists && (
+        <Account.Password studentId={selectedStudentID} token={token} />
       )}
     </div>
   );
-};
-
-export default UserManagement;
+}

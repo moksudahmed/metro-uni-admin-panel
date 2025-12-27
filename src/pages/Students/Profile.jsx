@@ -8,11 +8,11 @@ export default function Profile({ studentId, token }) {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  console.log("Test");
-  console.log(studentId)
+  
   /* -------------------- Load Student Data -------------------- */
   useEffect(() => {
-    if (!studentId || !token) return;
+   //if (!studentId || !token) return; 
+   if (!studentId) return;
 
     const loadProfile = async () => {
       setLoading(true);
@@ -21,7 +21,7 @@ export default function Profile({ studentId, token }) {
       try {
         const record = await fetchStudentRecord(studentId, token);
         const photo = await fetchStudentPhoto(studentId, token);
-
+        console.log(record);
         setStudent(record);
         setPhotoUrl(photo);
       } catch (err) {
