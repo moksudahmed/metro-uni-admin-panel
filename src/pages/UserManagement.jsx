@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Search, User, PlusCircle, X } from "lucide-react";
+import { Search, User, PlusCircle, X, Lock } from "lucide-react";
 import Profile from "./Students/Profile";
 import Account from "./Students/Account";
 import "./user-management.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL;
-const TABS = ["search", "profile", "account", "password"];
+const TABS = ["search", "profile", "account"];
 
 export default function UserManagement({ token }) {
   const [tab, setTab] = useState("search");
@@ -19,12 +19,18 @@ export default function UserManagement({ token }) {
 
   const [checkingAccount, setCheckingAccount] = useState(false);
   const [accountExists, setAccountExists] = useState(false);
+  const [account, setAccount] = useState({
+    login_id: "",
+    usr_active: true,
+  });
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const [accountForm, setAccountForm] = useState({
     loginID: "",
+    password: "",
+    confirmPassword: "",
     usr_active: true,
   });
 
@@ -43,7 +49,6 @@ export default function UserManagement({ token }) {
         `${API_BASE_URL}/api/v1/admin/students/${q}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       if (!res.ok) throw new Error();
 
       const data = await res.json();
@@ -72,10 +77,17 @@ export default function UserManagement({ token }) {
       setCheckingAccount(true);
       try {
         const res = await fetch(
-          `${API_BASE_URL}/api/v1/admin/student-users/${selectedStudentID}`,
+          `${API_BASE_URL}/api/v1/admin/student-users-account/${selectedStudentID}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setAccountExists(res.ok);
+        if (!res.ok) throw new Error();
+
+        const data = await res.json();
+        setAccount({
+          login_id: data.login_id || "",
+          usr_active: Boolean(data.is_active),
+        });
+        setAccountExists(true);
       } catch {
         setAccountExists(false);
       } finally {
@@ -88,35 +100,60 @@ export default function UserManagement({ token }) {
 
   /* ================= CREATE ACCOUNT ================= */
   const submitCreateAccount = async (e) => {
-    e.preventDefault();
-    if (!accountForm.loginID.trim()) return;
+  e.preventDefault();
 
-    setCreating(true);
-    try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/v1/admin/student-users/${selectedStudentID}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(accountForm),
-        }
-      );
+  if (!accountForm.loginID.trim()) {
+    alert("Login ID is required");
+    return;
+  }
 
-      if (!res.ok) throw new Error();
+  if (!accountForm.password || accountForm.password.length < 6) {
+    alert("Password must be at least 6 characters");
+    return;
+  }
 
-      setAccountExists(true);
-      setShowCreateForm(false);
-      setTab("account");
-      alert("Account created successfully");
-    } catch {
-      alert("Failed to create account");
-    } finally {
-      setCreating(false);
+  if (accountForm.password !== accountForm.confirmPassword) {
+    alert("Passwords do not match");
+    return;
+  }
+
+  setCreating(true);
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/admin/create-user`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          student_id: selectedStudentID,
+          login_id: accountForm.loginID.trim(),
+          password: accountForm.password,
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err?.detail || "Account creation failed");
     }
-  };
+
+    alert("✅ Account created successfully");
+
+    setAccountExists(true);
+    setShowCreateForm(false);
+    setTab("account");
+
+  } catch (error) {
+    alert(`❌ ${error.message}`);
+  } finally {
+    setCreating(false);
+  }
+};
+
 
   return (
     <div className="user-page">
@@ -132,11 +169,7 @@ export default function UserManagement({ token }) {
             key={t}
             className={`tab ${tab === t ? "active" : ""}`}
             onClick={() => setTab(t)}
-            disabled={
-              t !== "search" &&
-              (!selectedStudentID ||
-                (t === "password" && !accountExists))
-            }
+            disabled={t !== "search" && !selectedStudentID}
           >
             {t.toUpperCase()}
           </button>
@@ -216,6 +249,31 @@ export default function UserManagement({ token }) {
                   required
                 />
 
+                <label>
+                  <Lock size={14} /> Password
+                </label>
+                <input
+                  type="password"
+                  value={accountForm.password}
+                  onChange={(e) =>
+                    setAccountForm({ ...accountForm, password: e.target.value })
+                  }
+                  required
+                />
+
+                <label>Confirm Password</label>
+                <input
+                  type="password"
+                  value={accountForm.confirmPassword}
+                  onChange={(e) =>
+                    setAccountForm({
+                      ...accountForm,
+                      confirmPassword: e.target.value,
+                    })
+                  }
+                  required
+                />
+
                 <label className="checkbox">
                   <input
                     type="checkbox"
@@ -241,11 +299,11 @@ export default function UserManagement({ token }) {
 
       {/* ================= ACCOUNT ================= */}
       {tab === "account" && selectedStudentID && accountExists && (
-        <Account studentId={selectedStudentID} token={token} />
-      )}
-
-      {tab === "password" && selectedStudentID && accountExists && (
-        <Account.Password studentId={selectedStudentID} token={token} />
+        <Account
+          studentId={selectedStudentID}
+          account={account}
+          token={token}
+        />
       )}
     </div>
   );

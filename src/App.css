@@ -8,7 +8,11 @@
   padding: 0;
   box-sizing: border-box;
 }
-
+html,
+body,
+#root {
+  height: 100%;
+}
 :root {
   /* Primary Colors */
   --primary-blue: #2563eb;
