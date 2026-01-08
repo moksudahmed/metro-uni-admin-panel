@@ -1,22 +1,39 @@
 import { useState } from "react";
-import { Lock, AlertTriangle, ShieldCheck, RefreshCcw } from "lucide-react";
+import {
+  ShieldCheck,
+  UserPlus,
+  AlertTriangle,
+  Save,
+} from "lucide-react";
 import "./settings.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL;
 
 export default function Settings() {
-  const [loginID, setLoginID] = useState("");
+  const [form, setForm] = useState({
+    personID: "",
+    loginID: "",
+    password: "",
+    usr_role: "basic-user",
+  });
+
   const [loading, setLoading] = useState(false);
 
-  /* ================= RESET / GENERATE PASSWORD ================= */
-  const generatePassword = async () => {
-    if (!loginID) {
-      return alert("Please enter Login ID");
+  /* ================= CREATE USER ================= */
+  const createUser = async (e) => {
+    e.preventDefault();
+
+    if (!form.personID || !form.loginID || !form.password) {
+      return alert("All fields are required");
+    }
+
+    if (form.password.length < 6) {
+      return alert("Password must be at least 6 characters");
     }
 
     if (
       !window.confirm(
-        "This will reset the password to default (12345678). Continue?"
+        "Are you sure you want to create this user?"
       )
     ) {
       return;
@@ -25,19 +42,34 @@ export default function Settings() {
     setLoading(true);
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/v1/admin-user/generate-password/${encodeURIComponent(loginID)}`,
+        `${API_BASE_URL}/api/v1/admin-user/create-user`,
         {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            personID: Number(form.personID),
+            loginID: form.loginID,
+            password: form.password,
+            usr_role: form.usr_role,
+          }),
         }
       );
-
-      if (!res.ok) throw new Error("Request failed");
+      console.log(res);
+      if (!res.ok) throw new Error();
 
       await res.json();
-      alert("✅ Password reset successfully.\nNew Password: 12345678");
-      setLoginID("");
-    } catch (err) {
-      alert("❌ Failed to reset password");
+      alert("✅ User created successfully");
+
+      setForm({
+        personID: "",
+        loginID: "",
+        password: "",
+        usr_role: "basic-user",
+      });
+    } catch {
+      alert("❌ Failed to create user");
     } finally {
       setLoading(false);
     }
@@ -50,29 +82,75 @@ export default function Settings() {
         <h2>
           <ShieldCheck size={22} /> Settings
         </h2>
-        <p>Administrative account actions</p>
+        <p>Administrative user management</p>
       </div>
 
-      {/* ================= PASSWORD RESET CARD ================= */}
-      <div className="card danger">
+      {/* ================= CREATE USER CARD ================= */}
+      <form className="card" onSubmit={createUser}>
         <div className="card-header">
-          <h3 className="card-title text-danger">
-            <AlertTriangle size={18} /> Reset User Password
+          <h3 className="card-title">
+            <UserPlus size={18} /> Create New User
           </h3>
           <p className="card-subtitle">
-            Generates a default password for the selected user
+            Create an administrative user account
           </p>
         </div>
 
         <div className="card-body">
           <div className="form-group">
-            <label>User Login ID</label>
+            <label>Person ID</label>
+            <input
+              type="number"
+              placeholder="Enter person ID"
+              value={form.personID}
+              onChange={(e) =>
+                setForm({ ...form, personID: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Login ID (Email / Username)</label>
             <input
               type="text"
-              placeholder="Enter login ID (email / username)"
-              value={loginID}
-              onChange={(e) => setLoginID(e.target.value)}
+              placeholder="Enter login ID"
+              value={form.loginID}
+              onChange={(e) =>
+                setForm({ ...form, loginID: e.target.value })
+              }
+              required
             />
+          </div>
+
+          <div className="form-group">
+            <label>Password</label>
+            <input
+              type="password"
+              placeholder="Minimum 6 characters"
+              value={form.password}
+              onChange={(e) =>
+                setForm({ ...form, password: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>User Role</label>
+            <select
+              value={form.usr_role}
+              onChange={(e) =>
+                setForm({ ...form, usr_role: e.target.value })
+              }
+            >
+              <option value="basic-user">Basic User</option>
+              <option value="admin">Admin</option>
+              <option value="super-admin">Super Admin</option>
+              <option value="faculty">Faculty</option>
+              <option value="exam">Exam</option>
+              <option value="registry">Registry</option>
+            </select>
           </div>
 
           <div className="alert alert-warning">
@@ -80,8 +158,8 @@ export default function Settings() {
             <div>
               <strong>Security Notice</strong>
               <p>
-                Password will be reset to <b>12345678</b>. The user should change
-                it immediately after login.
+                The user should change the password after first
+                login.
               </p>
             </div>
           </div>
@@ -89,15 +167,15 @@ export default function Settings() {
 
         <div className="card-footer">
           <button
-            className="btn btn-danger"
-            onClick={generatePassword}
+            type="submit"
+            className="btn btn-primary"
             disabled={loading}
           >
-            <RefreshCcw size={16} />
-            {loading ? "Processing…" : "Generate Password"}
+            <Save size={16} />
+            {loading ? "Creating…" : "Create User"}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
